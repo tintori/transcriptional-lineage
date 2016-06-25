@@ -47,6 +47,9 @@ synthData <- function(){
 }
 synthData()
 
+if(!file.exists("04_analysesOut/"){
+    dir.create("04_analysesOut/")
+}
 
 ##
 # Figure 1A
