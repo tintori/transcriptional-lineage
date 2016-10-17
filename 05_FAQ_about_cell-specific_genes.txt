@@ -1,0 +1,44 @@
+QUESTION:
+
+In the section of ‘Clustering transcriptomes by multi-gene approach and identifying clusters using candidate genes’(EXTENDED METHODS), it has this sentence “The algorithm for gene selection selects the 100 most cell-specific genes for each transcriptome of a given stage”. How do you define ‘most cell-specific genes’?
+
+
+ANSWER:
+
+When choosing cell-specific genes, I made a sort of "uniqueness index" score for each gene, in each cell. The process is a little complicated, but bear with me:
+
+For a hypothetical gene, its expression levels in 8 cells from a single embryo might be something like this:
+cell A: 0 RPKM
+cell B: 56 RPKM
+cell C: 89 RPKM
+cell D: 5 RPKM
+cell E: 7 RPKM
+cell F: 2 RPKM
+cell G: 13 RPKM
+cell H: 2 RPKM
+
+We can see by eye that cells B and C have the highest expression, and expression is pretty unique to just those cells, but I needed an algorithm to figure that out for me, and repeat it for every single gene. The basic strategy was to figure out where the cutoff was, for any given gene, between cells that seem to be expressing the gene (the "haves", ie. cells B and C) and cells that seem to be not expressing the gene (the "havenots", ie. cells A, D, E, F, G, H). The raw RPKM value of this cutoff is going to be different for each gene, because some genes are effective at low levels, and some genes must be expressed at higher levels to be effective. 
+
+The first step is to put the expression levels for the gene from each cell in decreasing order, and add 3 RPKM to all values (to add a little buffer and avoid dividing by 0 in the future):
+92, 59, 16, 10, 8, 5, 5, 3
+
+Then I tried every possible cutoff between the "haves" and "havenots", and calculated what the ratio of average expression of "haves" to average expression of "havenots" would be. For example, if I set the cutoff between the first cell (with 92 RPKM) and the rest of the cells (59 to 3 RPKM), the ratio between the averages of "haves" and "havenots" would be 6.08. If I set the cutoff between the top two cells (92, 59) and the rest (16-3), the ratio between the averages would be 9.64. 
+
+I repeated this for every possible cutoff between "haves" and "havenots", and then chose the cutoff that yielded the highest ratio (in this case, between the two highest expression levels and the six lowest, with a ratio of 9.64). This is meant to reproduce what we would do by eye, which is look for ones that stand out as distinctly higher expression, relative to the whole group.
+
+So far, for this hypothetical gene, this algorithm tells us that the gene is specifically expressed in cells B and C, with an index value of 9.64 (the ratio of B+C's average expression compared to the rest). I added one more factor to the index value, which was to decrease the score proportionally to how many cells were being considered "haves". Basically, I wanted the "haves" in a set like {0,0,0,0,0,0,0,52} to have a higher uniqueness score than the "haves" in a set like this {0,52,52,52,52,52,52,52}, even though the ratio between haves average and havenots average would be the same.
+
+To do that, I multiplied each index value by 1-((# haves / # total)^2) . In the case of our hypothetical gene, there are 2 haves, and 8 total, so the uniqueness index value gets multiplied by 0.9375.
+
+In the end, I assign this uniqueness index score to just the cells that are considered "haves" and give NA to the "havenots". So for this hypothetical gene, the uniqueness index scores are as follows:
+
+cell A: NA
+cell B: 9.04
+cell C: 9.04
+cell D: NA
+cell E: NA
+cell F: NA
+cell G: NA
+cell H: NA
+
+I then repeated this algorithm for every gene, and made a big matrix with a column for every cell from a single embryo, and a row for every gene. To chose the 100 most cell specific genes for cell A, for example, I took the 100 genes with the highest uniqueness indices. 
